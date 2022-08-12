@@ -1,0 +1,136 @@
+## Keycloak Authentication with Apache Superset
+## Author:  Rahul Soni (Rahul-Soni28)
+
+image:
+  repository: apache/superset
+  tag: latest-dev
+  pullPolicy: IfNotPresent
+
+ingress:
+  annotations:
+    nginx.ingress.kubernetes.io/client-body-buffer-size: 10M
+    nginx.ingress.kubernetes.io/proxy-body-size: 10M
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "10M"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+  enabled: true
+  ingressClassName: nginx
+  path: /
+  pathType: ImplementationSpecific
+  hosts:
+    - report.qa.go1percent.com
+  tls:
+   - secretName: report-tls
+     hosts:
+       - report.qa.go1percent.com
+
+
+## Superset node configuration
+supersetNode:
+  connections:
+    db_host: postgres-svc.postgres.svc.cluster.local
+    db_port: "5432"
+    db_user: shubham
+    db_pass: kNtI9Ad3jS
+    db_name: superset
+  
+postgresql:
+  enabled: false
+
+extraEnv:
+  # GUNICORN_TIMEOUT: 300
+  PUBLIC_ROLE_LIKE: Gamma
+  OIDC_OPENID_REALM: knoldus
+  APP_NAME: Superset
+  BABEL_DEFAULT_LOCALE: pt_BR
+  DATABASE_DB: superset
+  DATABASE_HOST: postgres-svc.postgres.svc.cluster.local
+  DATABASE_PASSWORD: kNtI9Ad3jS
+  DATABASE_USER: shubham
+  REDIS_HOST: superset-keycloak-redis-master
+  REDIS_PORT: 6379
+  # database engine specific environment variables
+  # change the below if you prefers another database engine
+  DATABASE_PORT: 5432
+  DATABASE_DIALECT: postgresql
+  POSTGRES_DB: superset
+  POSTGRES_USER: shubham
+  POSTGRES_PASSWORD: kNtI9Ad3jS
+init:
+  adminUser:
+    username: admin
+    firstname: Superset
+    lastname: Admin
+    email: admin@knoldus.com
+    password: admin
+
+extraSecrets:
+  client_secret.json: |
+    {    "web": {      "issuer": "https://auth.knoldus.com/auth/realms/knoldus",      "auth_uri": "https://auth.knoldus.com/auth/realms/knoldus/protocol/openid-connect/auth",      "client_id": "leaderboard-ui",      "client_secret": "GXJ39qQxV0KQQFYl7bhfP0Y87LQnGQA1",      "redirect_uris": ["https://auth.knoldus.com/*"],      "userinfo_uri": "https://auth.knoldus.com/auth/realms/knoldus/protocol/openid-connect/userinfo",      "token_uri": "https://auth.knoldus.com/auth/realms/knoldus/protocol/openid-connect/token",      "token_introspection_uri": "https://auth.knoldus.com/auth/realms/knoldus/protocol/openid-connect/token/introspect"    }  }
+  keycloak_security_manager.py: |
+    from flask_appbuilder.security.manager import AUTH_OID
+    from superset.security import SupersetSecurityManager
+    from flask_oidc import OpenIDConnect
+    from flask_appbuilder.security.views import AuthOIDView
+    from flask_login import login_user
+    from urllib.parse import quote
+    from flask_appbuilder.views import expose
+    from flask import request, redirect
+    
+    
+    class OIDCSecurityManager(SupersetSecurityManager):
+    
+        def __init__(self, appbuilder):
+            super(OIDCSecurityManager, self).__init__(appbuilder)
+            if self.auth_type == AUTH_OID:
+                self.oid = OpenIDConnect(self.appbuilder.get_app)
+            self.authoidview = AuthOIDCView
+    
+    
+    class AuthOIDCView(AuthOIDView):
+    
+        @expose('/login/', methods=['GET', 'POST'])
+        def login(self, flag=True):
+            sm = self.appbuilder.sm
+            oidc = sm.oid
+            superset_roles = ["Admin", "Alpha", "Gamma", "Public", "granter", "sql_lab"]
+            default_role = "Gamma"
+    
+            @self.appbuilder.sm.oid.require_login
+            def handle_login():
+                user = sm.auth_user_oid(oidc.user_getfield('email'))
+    
+                if user is None:
+                    info = oidc.user_getinfo(['preferred_username', 'given_name', 'family_name', 'email', 'roles'])
+                    roles = [role for role in superset_roles if role in info.get('roles', [])]
+                    roles += [default_role, ] if not roles else []
+                    user = sm.add_user(info.get('preferred_username'), info.get('given_name', ''), info.get('family_name', ''),
+                                       info.get('email'), [sm.find_role(role) for role in roles])
+    
+                login_user(user, remember=False)
+                return redirect(self.appbuilder.get_url_for_index)
+    
+            return handle_login()
+    
+        @expose('/logout/', methods=['GET', 'POST'])
+        def logout(self):
+            oidc = self.appbuilder.sm.oid
+    
+            oidc.logout()
+            super(AuthOIDCView, self).logout()
+            redirect_url = request.url_root.strip('/')
+            # redirect_url = request.url_root.strip('/') + self.appbuilder.get_url_for_login
+    
+            return redirect(
+                oidc.client_secrets.get('issuer') + '/protocol/openid-connect/logout?redirect_uri=' + quote(redirect_url))
+
+bootstrapScript: |
+  #!/bin/bash
+  rm -rf /var/lib/apt/lists/* && \
+  pip install \
+    psycopg2-binary==2.9.1 \
+    itsdangerous==2.0.1 \
+    flask-oidc==1.4.0 \
+    Flask-OpenID==1.3.0 \
+    redis==3.5.3 && \
+  if [ ! -f ~/bootstrap ]; then echo "Running Superset with uid {{ .Values.runAsUser }}" > ~/bootstrap; fi
