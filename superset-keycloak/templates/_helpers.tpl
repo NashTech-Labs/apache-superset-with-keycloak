@@ -70,7 +70,7 @@ CORS_OPTIONS = {
     'supports_credentials': True,
     'allow_headers': ['*'],
     'resources':['*'],
-    'origins': ['https://superset.qa.go1percent.com/','https://leaderboard-qa.knoldus.com/',],
+    'origins': ['*'],
 }
 ENABLE_PROXY_FIX = True
 PUBLIC_ROLE_LIKE_GAMMA = True

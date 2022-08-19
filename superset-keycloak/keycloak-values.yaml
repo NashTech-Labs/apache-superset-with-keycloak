@@ -18,20 +18,20 @@ ingress:
   path: /
   pathType: ImplementationSpecific
   hosts:
-    - report.qa.go1percent.com
+    - <YOUR_HOST_NAME>
   tls:
    - secretName: report-tls
      hosts:
-       - report.qa.go1percent.com
+       - <YOUR_HOST_NAME>
 
 
 ## Superset node configuration
 supersetNode:
   connections:
-    db_host: postgres-svc.postgres.svc.cluster.local
+    db_host: <POSTGRES_SERVICE_NAME>.NAMESPACE.svc.cluster.local
     db_port: "5432"
-    db_user: shubham
-    db_pass: kNtI9Ad3jS
+    db_user: <USERNAME>
+    db_pass: <PASSWORD>
     db_name: superset
   
 postgresql:
@@ -40,13 +40,13 @@ postgresql:
 extraEnv:
   # GUNICORN_TIMEOUT: 300
   PUBLIC_ROLE_LIKE: Gamma
-  OIDC_OPENID_REALM: knoldus
+  OIDC_OPENID_REALM: <YOUR_REALM_NAME>
   APP_NAME: Superset
   BABEL_DEFAULT_LOCALE: pt_BR
   DATABASE_DB: superset
-  DATABASE_HOST: postgres-svc.postgres.svc.cluster.local
-  DATABASE_PASSWORD: kNtI9Ad3jS
-  DATABASE_USER: shubham
+  DATABASE_HOST: <POSTGRES_SERVICE_NAME>.NAMESPACE.svc.cluster.local
+  DATABASE_PASSWORD: <PASSWORD>
+  DATABASE_USER: <USERNAME>
   REDIS_HOST: superset-keycloak-redis-master
   REDIS_PORT: 6379
   # database engine specific environment variables
@@ -54,19 +54,23 @@ extraEnv:
   DATABASE_PORT: 5432
   DATABASE_DIALECT: postgresql
   POSTGRES_DB: superset
-  POSTGRES_USER: shubham
-  POSTGRES_PASSWORD: kNtI9Ad3jS
+  POSTGRES_USER: <USERNAME>
+  POSTGRES_PASSWORD: <PASSWORD>
+
+
 init:
   adminUser:
     username: admin
     firstname: Superset
     lastname: Admin
-    email: admin@knoldus.com
+    email: admin@superset.com
     password: admin
 
 extraSecrets:
   client_secret.json: |
-    {    "web": {      "issuer": "https://auth.knoldus.com/auth/realms/knoldus",      "auth_uri": "https://auth.knoldus.com/auth/realms/knoldus/protocol/openid-connect/auth",      "client_id": "leaderboard-ui",      "client_secret": "GXJ39qQxV0KQQFYl7bhfP0Y87LQnGQA1",      "redirect_uris": ["https://auth.knoldus.com/*"],      "userinfo_uri": "https://auth.knoldus.com/auth/realms/knoldus/protocol/openid-connect/userinfo",      "token_uri": "https://auth.knoldus.com/auth/realms/knoldus/protocol/openid-connect/token",      "token_introspection_uri": "https://auth.knoldus.com/auth/realms/knoldus/protocol/openid-connect/token/introspect"    }  }
+    <YOUR_CLIENT_SECRET_JSON_STRING>
+
+    
   keycloak_security_manager.py: |
     from flask_appbuilder.security.manager import AUTH_OID
     from superset.security import SupersetSecurityManager
