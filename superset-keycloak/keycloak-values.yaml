@@ -20,7 +20,7 @@ ingress:
   hosts:
     - <YOUR_HOST_NAME>
   tls:
-   - secretName: report-tls
+   - secretName: <TLS_SECRET_NAME>
      hosts:
        - <YOUR_HOST_NAME>
 
